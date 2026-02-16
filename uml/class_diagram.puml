@@ -1,0 +1,175 @@
+@startuml
+hide circle
+skinparam linetype ortho
+
+entity "**books**" as book {
+  * id : BIGINT
+  --
+  title : VARCHAR
+  description : TEXT
+}
+
+entity "**authors**" as author {
+  * id : BIGINT
+  --
+  name : VARCHAR
+}
+
+entity "**genres**" as genre {
+  * id : BIGINT
+  --
+  name : VARCHAR
+}
+
+entity "**users**" as user {
+  * id : BIGINT
+  --
+  email : VARCHAR
+  password : VARCHAR
+  role : VARCHAR
+}
+
+' Промежуточные таблицы (Связи)
+entity "**book_authors**" as ba {
+  * book_id
+  * author_id
+}
+
+entity "**book_genres**" as bg {
+  * book_id
+  * genre_id
+}
+
+entity "**user_favorites**" as uf {
+  * user_id
+  * book_id
+}
+
+book ||--o{ ba
+author ||--o{ ba
+
+book ||--o{ bg
+genre ||--o{ bg
+
+user ||--o{ uf
+book ||--o{ uf
+
+@enduml
+@startuml
+skinparam classAttributeIconSize 0
+
+package "entity" {
+
+class Author {
+    - id : Long
+    - name : String
+}
+
+class Genre {
+    - id : Long
+    - name : String
+}
+
+class Book {
+    - id : Long
+    - title : String
+    - description : String
+    - authors : Set<Author>
+    - genres : Set<Genre>
+}
+
+class User {
+    - id : Long
+    - email : String
+    - password : String
+    - role : String
+    - favorites : Set<Book>
+}
+
+enum Role {
+    ADMIN
+    CLIENT
+}
+
+}
+
+package "repository" {
+
+interface BookRepository {
+}
+
+interface UserRepository {
+    + findByEmail(email : String) : Optional<User>
+}
+
+}
+
+package "service" {
+
+interface UserDetailsService {
+    + loadUserByUsername(username : String) : UserDetails
+}
+
+class UserService {
+    - userRepository : UserRepository
+    - bookRepository : BookRepository
+
+    + loadUserByUsername(email : String) : UserDetails
+    + registerUser(user : User) : User
+    + login(email : String, password : String) : User
+    + addBookToFavorites(userId : Long, bookId : Long) : void
+    + removeBookFromFavorites(userId : Long, bookId : Long) : void
+}
+
+}
+
+package "controller" {
+
+class LibraryController {
+    - bookRepository : BookRepository
+    - userRepository : UserRepository
+    - userService : UserService
+
+    + getAllBooks() : List<Book>
+    + addBook(book : Book) : Book
+    + getBookById(id : Long) : ResponseEntity<Book>
+    + registerUser(user : User) : ResponseEntity<?>
+    + login(email : String, password : String) : ResponseEntity<?>
+    + deleteBook(id : Long) : ResponseEntity<Void>
+    + addToFavorites(userId : Long, bookId : Long) : ResponseEntity<String>
+    + removeFromFavorites(userId : Long, bookId : Long) : ResponseEntity<String>
+    + exportBooksToCSV() : void
+}
+
+}
+
+package "config" {
+
+class SecurityConfig {
+    + securityFilterChain(http : HttpSecurity) : SecurityFilterChain
+    + passwordEncoder() : PasswordEncoder
+}
+
+}
+
+' ================= RELATIONSHIPS =================
+
+' Many-to-Many relationships
+Book "0..*" -- "0..*" Author
+Book "0..*" -- "0..*" Genre
+User "0..*" -- "0..*" Book : favorites
+
+' Service implements interface
+UserService ..|> UserDetailsService
+
+' Dependencies
+UserService --> UserRepository
+UserService --> BookRepository
+
+LibraryController --> BookRepository
+LibraryController --> UserRepository
+LibraryController --> UserService
+
+SecurityConfig --> UserService
+
+@enduml
